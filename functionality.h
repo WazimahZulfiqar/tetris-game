@@ -1,7 +1,7 @@
 
 #pragma once
 
-// Game logic functions
+// Game logic  functions
 bool anamoly();
 void rotation(bool& rotate);
 void movement(int& delta_x);
