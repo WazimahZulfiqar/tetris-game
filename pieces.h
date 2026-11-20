@@ -1,11 +1,9 @@
 #pragma once
 
-// ================================================================
 //  TETROMINO DEFINITIONS
 //  Each row = one piece type, 4 values = the 4 cells in a 2x4 grid.
 //  Value encodes (col, row) as:  col = value % 2,  row = value / 2
 //  This matches the original code exactly.
-// ================================================================
 inline int BLOCKS[7][4] = {
     { 1, 3, 5, 7 },   // 0  I  – vertical bar
     { 2, 4, 5, 7 },   // 1  Z
