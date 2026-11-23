@@ -5,7 +5,7 @@
 
 // DRAWING FUNCTIONS
 
-// Draw the background
+// Draw background
 void drawPolkaBg(sf::RenderWindow& win) {
     sf::RectangleShape bg({ (float)WIN_W, (float)WIN_H });
     bg.setFillColor(C_BG);

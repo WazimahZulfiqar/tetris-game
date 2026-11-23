@@ -4,7 +4,7 @@
 #include "pieces.h"
 #include <string>
 
-// DRAWING FUNCTIONS
+//DRAWING FUNCTIONS
 
 void drawPolkaBg(sf::RenderWindow& win);
 

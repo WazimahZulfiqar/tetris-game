@@ -35,9 +35,9 @@ inline int g_nextColor = 1;
 
 
 
-// ================================================================
-//  KAWAII COLOUR PALETTE
-// ================================================================
+
+// COLOUR PALETTE
+
 const sf::Color C_BG{ 200, 240, 215 };   // light green background
 const sf::Color C_BOARD{ 210, 245, 225 };   // soft mint board
 const sf::Color C_DEEP_PINK{ 255,  20, 147 };
