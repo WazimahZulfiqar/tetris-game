@@ -1,14 +1,17 @@
-
 #pragma once
+#include <SFML/Graphics.hpp>
+#include <string>
 
-// Game logic  functions
+// ================================================================
+//  GAME LOGIC   (implemented in functionality.cpp)
+// ================================================================
 bool anamoly();
 void rotation(bool& rotate);
 void movement(int& delta_x);
 void checkLines(int& linesCleared);
-
-void fallingPiece(float& timer, float& delay,
-    int& colorNum, bool& gameOver);
-
+void fallingPiece(float& timer,
+    float& delay,
+    int& colorNum,
+    bool& gameOver);
 void spawnPiece(int type, int colorNum);
 void hardDrop(int& colorNum, bool& gameOver);
