@@ -3,173 +3,147 @@
 #include <cstdlib>
 #include <ctime>
 #include <string>
-
 #include "utils.h"
 #include "pieces.h"
 #include "functionality.h"
-
+#include "drawing.h"
 using namespace sf;
 
-// Seven piece colors
-Color pieceColors[8] = {
-    Color::Black,
-    Color(60, 180, 210),    // I - Cyan
-    Color(220, 90, 90),     // Z - Red
-    Color(100, 180, 110),   // S - Green
-    Color(160, 110, 210),   // T - Purple
-    Color(230, 160, 80),    // L - Orange
-    Color(90, 120, 210),    // J - Blue
-    Color(230, 200, 90)     // O - Yellow
-};
-
-// Function to draw text
-void drawGameText(RenderWindow& window, Font& font,
-    std::string message, unsigned int size,
-    Color color, float x, float y)
-{
-    Text text(font, message, size);
-
-    text.setFillColor(color);
-    text.setPosition({ x, y });
-
-    window.draw(text);
+static float maxFloat(float a, float b) {
+    return (a > b) ? a : b;
 }
 
-// Function to draw a panel
-void drawPanel(RenderWindow& window,
-    float x, float y, float width, float height)
-{
-    RectangleShape panel({ width, height });
+int main() {
+    srand((unsigned int)time(nullptr));
 
-    panel.setPosition({ x, y });
-    panel.setFillColor(Color(246, 250, 241));
-    panel.setOutlineColor(Color(125, 165, 135));
-    panel.setOutlineThickness(2.f);
-
-    window.draw(panel);
-}
-
-// Function to draw next piece
-void drawNext(RenderWindow& window, int type, int color)
-{
-    int minX = 10;
-    int minY = 10;
-
-    for (int i = 0; i < 4; i++)
-    {
-        int x = BLOCKS[type][i] % 2;
-        int y = BLOCKS[type][i] / 2;
-
-        if (x < minX)
-            minX = x;
-
-        if (y < minY)
-            minY = y;
-    }
-
-    for (int i = 0; i < 4; i++)
-    {
-        int x = BLOCKS[type][i] % 2 - minX;
-        int y = BLOCKS[type][i] / 2 - minY;
-
-        RectangleShape block({ 23.f, 23.f });
-
-        block.setPosition({
-            690.f + x * 28.f,
-            160.f + y * 28.f
-            });
-
-        block.setFillColor(pieceColors[color]);
-        block.setOutlineColor(Color(65, 95, 75));
-        block.setOutlineThickness(1.f);
-
-        window.draw(block);
-    }
-}
-
-int main()
-{
-    srand(static_cast<unsigned int>(time(nullptr)));
-
-    // Create game window
+    // SFML 3 window creation
     RenderWindow window(
         VideoMode({ (unsigned int)WIN_W, (unsigned int)WIN_H }),
-        "TETRIS",
-        Style::Titlebar | Style::Close
+        WINDOW_TITLE,
+        Style::Close | Style::Titlebar
     );
 
     window.setFramerateLimit(60);
 
     // Load font
     Font font;
-
-    if (!font.openFromFile("PressStart2P.ttf"))
-    {
+    if (!font.openFromFile("PressStart2P.ttf")) {
         return 1;
     }
 
-    // Game variables
+    // Load tile texture
+    Texture tilesTex;
+    if (!tilesTex.loadFromFile("tiles.png")) {
+        return 1;
+    }
+
+    Sprite tileSprite(tilesTex);
+
+    // Load background textures
+    Texture menuBgTex, gameOverTex;
+
+    bool menuLoaded = menuBgTex.loadFromFile("main_menu.jpeg");
+    bool gameOverLoaded = gameOverTex.loadFromFile("game_over_and_continue.jpeg");
+
+    // SFML 3 sprites are constructed using their textures
+    Sprite menuBgSpr(menuBgTex);
+    Sprite gameOverSpr(gameOverTex);
+
+    if (menuLoaded) {
+        menuBgSpr.setScale({
+            (float)WIN_W / menuBgTex.getSize().x,
+            (float)WIN_H / menuBgTex.getSize().y
+            });
+    }
+
+    if (gameOverLoaded) {
+        float scale = 420.f / (float)gameOverTex.getSize().x;
+
+        gameOverSpr.setScale({ scale, scale });
+        gameOverSpr.setPosition({
+            WIN_W / 2.f - 210.f,
+            60.f
+            });
+    }
+
+    const float MBW = 290.f, MBH = 50.f;
+    const float MBX = WIN_W / 2.f - MBW / 2.f;
+    const float MB_PLAY_Y = 370.f;
+    const float MB_SET_Y = 435.f;
+    const float MB_EXIT_Y = 500.f;
+
+    const float LP_X = 40.f, LP_W = 200.f;
+    const float LP_HOME_Y = 400.f, LP_HOME_H = 40.f;
+
+    const float RP_X = 620.f, RP_W = 200.f;
+    const float RP_NEXT_Y = 120.f, RP_NEXT_H = 120.f;
+    const float RP_CTRL_Y = 260.f, RP_CTRL_H = 230.f;
+
+    const float GO_BW = 155.f, GO_BH = 46.f;
+    const float GO_BY = 540.f;
+    const float GO_YES_X = WIN_W / 2.f - GO_BW - 10.f;
+    const float GO_HOME_X = WIN_W / 2.f + 10.f;
+
+    const float SET_BX = WIN_W / 2.f - 200.f;
+    const float SET_BY = 636.f;
+    const float SET_BW = 400.f, SET_BH = 46.f;
+
     int colorNum = 1;
-
     bool rotate = false;
-    bool gameOver = false;
-
     int delta_x = 0;
-
     float timer = 0.f;
     float delay = 0.3f;
+    bool gameOver = false;
 
     Clock clock;
 
     // Initialize game
-    auto initGame = [&]()
-        {
-            clearBoard();
+    auto initGame = [&]() {
+        clearBoard();
 
-            g_score = 0;
-            g_level = 1;
-            g_lines = 0;
-            g_paused = false;
+        g_score = 0;
+        g_level = 1;
+        g_lines = 0;
+        g_paused = false;
 
-            timer = 0.f;
-            delay = 0.3f;
+        timer = 0.f;
+        delay = 0.3f;
+        gameOver = false;
+        rotate = false;
+        delta_x = 0;
 
-            gameOver = false;
-            rotate = false;
-            delta_x = 0;
+        int type = rand() % 7;
 
-            int type = rand() % 7;
+        colorNum = PIECE_COLOR[type];
+        spawnPiece(type, colorNum);
 
-            colorNum = PIECE_COLOR[type];
-
-            spawnPiece(type, colorNum);
-
-            g_nextType = rand() % 7;
-            g_nextColor = PIECE_COLOR[g_nextType];
+        g_nextType = rand() % 7;
+        g_nextColor = PIECE_COLOR[g_nextType];
         };
 
-    initGame();
+    g_screen = Screen::MENU;
 
-    // Main game loop
-    while (window.isOpen())
-    {
+    // MAIN GAME LOOP
+    while (window.isOpen()) {
+
         float dt = clock.restart().asSeconds();
 
-        // Event handling
-        while (const auto event = window.pollEvent())
-        {
-            if (event->is<Event::Closed>())
-            {
+        // SFML 3 event handling
+        while (const auto event = window.pollEvent()) {
+
+            // Window close event
+            if (event->is<Event::Closed>()) {
                 window.close();
             }
 
-            if (const auto* key =
-                event->getIf<Event::KeyPressed>())
-            {
-                if (!gameOver && !g_paused)
-                {
-                    switch (key->code)
-                    {
+            // Keyboard event
+            if (const auto* key = event->getIf<Event::KeyPressed>()) {
+
+                if (g_screen == Screen::GAME &&
+                    !g_paused && !gameOver) {
+
+                    switch (key->code) {
+
                     case Keyboard::Key::Left:
                         delta_x = -1;
                         break;
@@ -185,6 +159,10 @@ int main()
                     case Keyboard::Key::Space:
                         hardDrop(colorNum, gameOver);
                         timer = 0.f;
+
+                        if (gameOver)
+                            g_screen = Screen::GAMEOVER;
+
                         break;
 
                     default:
@@ -192,32 +170,77 @@ int main()
                     }
                 }
 
-                if (key->code == Keyboard::Key::P && !gameOver)
-                {
+                if (key->code == Keyboard::Key::P &&
+                    g_screen == Screen::GAME) {
                     g_paused = !g_paused;
                 }
 
-                if (key->code == Keyboard::Key::R && gameOver)
-                {
-                    initGame();
+                if (key->code == Keyboard::Key::Escape &&
+                    g_screen != Screen::MENU) {
+                    g_screen = Screen::MENU;
                 }
+            }
 
-                if (key->code == Keyboard::Key::Escape)
-                {
-                    window.close();
+            // Mouse event
+            if (const auto* mouse =
+                event->getIf<Event::MouseButtonPressed>()) {
+
+                if (mouse->button == Mouse::Button::Left) {
+
+                    Vector2i m = Mouse::getPosition(window);
+
+                    if (g_screen == Screen::MENU) {
+
+                        if (mouseIn(m, MBX, MB_PLAY_Y, MBW, MBH)) {
+                            initGame();
+                            g_screen = Screen::GAME;
+                        }
+
+                        if (mouseIn(m, MBX, MB_SET_Y, MBW, MBH))
+                            g_screen = Screen::SETTINGS;
+
+                        if (mouseIn(m, MBX, MB_EXIT_Y, MBW, MBH))
+                            window.close();
+                    }
+
+                    else if (g_screen == Screen::GAME) {
+
+                        if (mouseIn(m, LP_X, LP_HOME_Y,
+                            LP_W, LP_HOME_H)) {
+                            g_screen = Screen::MENU;
+                        }
+                    }
+
+                    else if (g_screen == Screen::GAMEOVER) {
+
+                        if (mouseIn(m, GO_YES_X, GO_BY, GO_BW, GO_BH)) {
+                            initGame();
+                            g_screen = Screen::GAME;
+                        }
+
+                        if (mouseIn(m, GO_HOME_X, GO_BY, GO_BW, GO_BH))
+                            g_screen = Screen::MENU;
+                    }
+
+                    else if (g_screen == Screen::SETTINGS) {
+
+                        if (mouseIn(m, SET_BX, SET_BY,
+                            SET_BW, SET_BH)) {
+                            g_screen = Screen::MENU;
+                        }
+                    }
                 }
             }
         }
 
-        // Update game
-        if (!g_paused && !gameOver)
-        {
+        // GAME UPDATE
+        if (g_screen == Screen::GAME &&
+            !g_paused && !gameOver) {
+
             float dropDelay = delay;
 
             if (Keyboard::isKeyPressed(Keyboard::Key::Down))
-            {
                 dropDelay = 0.05f;
-            }
 
             rotation(rotate);
             movement(delta_x);
@@ -226,207 +249,342 @@ int main()
 
             fallingPiece(timer, dropDelay, colorNum, gameOver);
 
-            delay = 0.30f - (g_level - 1) * 0.025f;
+            delay = maxFloat(
+                0.08f,
+                0.30f - (g_level - 1) * 0.025f
+            );
 
-            if (delay < 0.08f)
-            {
-                delay = 0.08f;
-            }
+            if (gameOver)
+                g_screen = Screen::GAMEOVER;
         }
 
-        // Background
-        window.clear(Color(225, 240, 228));
+        window.clear();
 
-        // Main heading
-        drawGameText(window, font, "TETRIS",
-            22, Color(50, 95, 65), 365.f, 12.f);
+        // MAIN MENU
+        if (g_screen == Screen::MENU) {
 
-        // Left information panels
-        drawPanel(window, 35.f, 100.f, 225.f, 100.f);
-        drawPanel(window, 35.f, 220.f, 225.f, 100.f);
-        drawPanel(window, 35.f, 340.f, 225.f, 100.f);
+            if (menuLoaded) {
+                window.draw(menuBgSpr);
+            }
+            else {
+                RectangleShape sky({ (float)WIN_W, (float)WIN_H });
+                sky.setFillColor(Color(200, 240, 215));
+                window.draw(sky);
+            }
 
-        drawGameText(window, font, "SCORE",
-            10, Color(65, 110, 75), 55.f, 120.f);
+            RectangleShape tint({ (float)WIN_W, (float)WIN_H });
+            tint.setFillColor(Color(180, 230, 200, 55));
+            window.draw(tint);
 
-        drawGameText(window, font, std::to_string(g_score),
-            15, Color(45, 85, 60), 55.f, 155.f);
+            drawCard(window, WIN_W / 2.f - 200.f, 100.f, 400.f, 130.f);
 
-        drawGameText(window, font, "LEVEL",
-            10, Color(65, 110, 75), 55.f, 240.f);
+            drawTextC(window, font, "PROJECT", 18,
+                C_DEEP_PINK, WIN_W / 2.f, 116.f);
 
-        drawGameText(window, font, std::to_string(g_level),
-            15, Color(45, 85, 60), 55.f, 275.f);
+            drawTextC(window, font, "TETRIS", 18,
+                C_DEEP_PINK, WIN_W / 2.f, 158.f);
 
-        drawGameText(window, font, "LINES",
-            10, Color(65, 110, 75), 55.f, 360.f);
+            drawTextC(window, font, "* * *", 10,
+                C_LAVENDER, WIN_W / 2.f, 204.f);
 
-        drawGameText(window, font, std::to_string(g_lines),
-            15, Color(45, 85, 60), 55.f, 395.f);
+            drawButton(window, font, "PLAY     :)",
+                MBX, MB_PLAY_Y, MBW, MBH);
 
-        // Game board
-        RectangleShape board(
-            Vector2f((float)BOARD_W, (float)BOARD_H)
-        );
+            drawButton(window, font, "SETTINGS ::",
+                MBX, MB_SET_Y, MBW, MBH);
 
-        board.setPosition({
-            (float)BOARD_X,
-            (float)BOARD_Y
-            });
+            drawButton(window, font, "EXIT     []",
+                MBX, MB_EXIT_Y, MBW, MBH);
+        }
 
-        board.setFillColor(Color(190, 215, 195));
-        board.setOutlineColor(Color(65, 110, 75));
-        board.setOutlineThickness(3.f);
+        // GAME SCREEN
+        else if (g_screen == Screen::GAME) {
 
-        window.draw(board);
+            drawPolkaBg(window);
+            drawBoardFrame(window);
 
-        // Draw board cells
-        for (int r = 0; r < M; r++)
-        {
-            for (int c = 0; c < N; c++)
-            {
-                RectangleShape cell({
-                    (float)CELL - 1.f,
-                    (float)CELL - 1.f
+            // Locked cells
+            for (int r = 0; r < M; r++) {
+                for (int c = 0; c < N; c++) {
+
+                    if (gameGrid[r][c] == -1)
+                        continue;
+
+                    tileSprite.setTextureRect(
+                        IntRect(
+                            { gameGrid[r][c] * CELL, 0 },
+                            { CELL, CELL }
+                        )
+                    );
+
+                    tileSprite.setScale({ 1.f, 1.f });
+
+                    tileSprite.setPosition({
+                        (float)(BOARD_X + c * CELL),
+                        (float)(BOARD_Y + r * CELL)
+                        });
+
+                    window.draw(tileSprite);
+                }
+            }
+
+            // Ghost piece
+            drawGhost(window, tileSprite);
+
+            // Current piece
+            for (int i = 0; i < 4; i++) {
+
+                if (point_1[i][1] < 0)
+                    continue;
+
+                tileSprite.setTextureRect(
+                    IntRect(
+                        { colorNum * CELL, 0 },
+                        { CELL, CELL }
+                    )
+                );
+
+                tileSprite.setScale({ 1.f, 1.f });
+
+                tileSprite.setPosition({
+                    (float)(BOARD_X + point_1[i][0] * CELL),
+                    (float)(BOARD_Y + point_1[i][1] * CELL)
                     });
 
-                cell.setPosition({
-                    (float)(BOARD_X + c * CELL),
-                    (float)(BOARD_Y + r * CELL)
+                window.draw(tileSprite);
+            }
+
+            // LEFT PANEL
+            drawCard(window, LP_X, 80.f, LP_W, 80.f);
+
+            drawTextC(window, font, "SCORE", 7,
+                Color(50, 130, 80), LP_X + LP_W / 2, 96.f);
+
+            drawTextC(window, font, std::to_string(g_score), 14,
+                Color(50, 130, 80), LP_X + LP_W / 2, 120.f);
+
+            drawCard(window, LP_X, 180.f, LP_W, 80.f);
+
+            drawTextC(window, font, "LEVEL", 7,
+                Color(50, 130, 80), LP_X + LP_W / 2, 196.f);
+
+            drawTextC(window, font, std::to_string(g_level), 14,
+                Color(50, 130, 80), LP_X + LP_W / 2, 220.f);
+
+            drawCard(window, LP_X, 280.f, LP_W, 80.f);
+
+            drawTextC(window, font, "LINES", 7,
+                Color(50, 130, 80), LP_X + LP_W / 2, 296.f);
+
+            drawTextC(window, font, std::to_string(g_lines), 14,
+                Color(50, 130, 80), LP_X + LP_W / 2, 320.f);
+
+            drawButton(window, font, "HOME",
+                LP_X, LP_HOME_Y, LP_W, LP_HOME_H);
+
+            // RIGHT PANEL
+            drawCard(window, RP_X, 80.f, RP_W, 30.f);
+
+            drawTextC(window, font, "NEXT", 7,
+                Color(50, 130, 80), RP_X + RP_W / 2, 91.f);
+
+            drawCard(window, RP_X, RP_NEXT_Y, RP_W, RP_NEXT_H);
+
+            drawNextPiece(window, tileSprite,
+                RP_X, RP_NEXT_Y, RP_W, RP_NEXT_H);
+
+            drawCard(window, RP_X, RP_CTRL_Y, RP_W, RP_CTRL_H);
+
+            float hy = RP_CTRL_Y + 14.f;
+            const float hs = 32.f;
+
+            drawTextL(window, font, "[<>]  MOVE", 7,
+                Color(50, 130, 80), RP_X + 12.f, hy);
+            hy += hs;
+
+            drawTextL(window, font, "[^]   ROTATE", 7,
+                Color(50, 130, 80), RP_X + 12.f, hy);
+            hy += hs;
+
+            drawTextL(window, font, "[v]   SOFT", 7,
+                Color(50, 130, 80), RP_X + 12.f, hy);
+            hy += hs;
+
+            drawTextL(window, font, "[SPC] SLAM", 7,
+                Color(50, 130, 80), RP_X + 12.f, hy);
+            hy += hs;
+
+            drawTextL(window, font, "[P]   PAUSE", 7,
+                Color(50, 130, 80), RP_X + 12.f, hy);
+            hy += hs;
+
+            drawTextL(window, font, "[ESC] HOME", 7,
+                Color(50, 130, 80), RP_X + 12.f, hy);
+
+            // Pause overlay
+            if (g_paused) {
+
+                RectangleShape ov({
+                    (float)BOARD_W,
+                    (float)BOARD_H
                     });
 
-                if (gameGrid[r][c] != -1)
-                {
-                    int index = gameGrid[r][c];
+                ov.setPosition({ (float)BOARD_X, (float)BOARD_Y });
+                ov.setFillColor(Color(220, 250, 230, 210));
 
-                    if (index >= 1 && index <= 7)
-                    {
-                        cell.setFillColor(pieceColors[index]);
-                    }
-                }
-                else
-                {
-                    cell.setFillColor(Color(210, 230, 213));
-                }
+                window.draw(ov);
 
-                window.draw(cell);
+                drawTextC(window, font, "PAUSED", 16,
+                    C_DEEP_PINK,
+                    BOARD_X + BOARD_W / 2.f,
+                    BOARD_Y + BOARD_H / 2.f - 30.f);
+
+                drawTextC(window, font, "[P] resume", 7,
+                    C_HOT_PINK,
+                    BOARD_X + BOARD_W / 2.f,
+                    BOARD_Y + BOARD_H / 2.f + 20.f);
             }
         }
 
-        // Draw current falling piece
-        for (int i = 0; i < 4; i++)
-        {
-            int x = point_1[i][0];
-            int y = point_1[i][1];
+        // SETTINGS SCREEN
+        else if (g_screen == Screen::SETTINGS) {
 
-            if (y < 0 || x < 0 || x >= N || y >= M)
-            {
-                continue;
+            drawPolkaBg(window);
+
+            float cx = WIN_W / 2.f;
+            float cX = cx - 230.f;
+            float cY = 30.f;
+            float cW = 460.f;
+            float cH = 590.f;
+
+            auto solidR = [&](float x, float y,
+                float w, float h, Color c) {
+
+                    RectangleShape r({ w, h });
+                    r.setPosition({ x, y });
+                    r.setFillColor(c);
+                    window.draw(r);
+                };
+
+            solidR(cX - 12, cY - 12, cW + 24, cH + 24,
+                Color(180, 220, 200));
+
+            solidR(cX - 6, cY - 6, cW + 12, cH + 12,
+                C_BORDER);
+
+            drawCard(window, cX, cY, cW, cH);
+
+            float ty = cY + 24.f;
+
+            drawTextC(window, font, "HOW TO PLAY", 13,
+                Color(50, 130, 80), cx, ty);
+
+            ty += 56.f;
+
+            RectangleShape div({ cW - 40.f, 3.f });
+            div.setPosition({ cX + 20.f, ty });
+            div.setFillColor(C_BTN);
+            window.draw(div);
+
+            ty += 22.f;
+
+            struct Row {
+                const char* key;
+                const char* desc;
+            };
+
+            Row rows[] = {
+                {"< >",   "Move left / right"},
+                {"UP",    "Rotate piece"},
+                {"DOWN",  "Soft drop"},
+                {"SPACE", "Hard drop (slam!)"},
+                {"P",     "Pause / Resume"},
+                {"ESC",   "Back to menu"}
+            };
+
+            for (auto& row : rows) {
+
+                RectangleShape badge({ 100.f, 28.f });
+                badge.setPosition({ cX + 24.f, ty });
+                badge.setFillColor(C_BTN);
+                window.draw(badge);
+
+                RectangleShape bsh({ 100.f, 4.f });
+                bsh.setPosition({ cX + 24.f, ty + 28.f });
+                bsh.setFillColor(C_BTN_SHADOW);
+                window.draw(bsh);
+
+                drawTextC(window, font, row.key, 7,
+                    Color::White, cX + 74.f, ty + 7.f);
+
+                drawTextL(window, font, row.desc, 7,
+                    C_TEXT_PINK, cX + 138.f, ty + 7.f);
+
+                ty += 46.f;
             }
 
-            RectangleShape block({
-                (float)CELL - 1.f,
-                (float)CELL - 1.f
-                });
+            RectangleShape tip({ cW - 40.f, 66.f });
+            tip.setPosition({ cX + 20.f, ty });
+            tip.setFillColor(Color(180, 230, 200, 90));
+            tip.setOutlineColor(Color(180, 220, 200));
+            tip.setOutlineThickness(2.f);
 
-            block.setPosition({
-                (float)(BOARD_X + x * CELL),
-                (float)(BOARD_Y + y * CELL)
-                });
+            window.draw(tip);
 
-            block.setFillColor(pieceColors[colorNum]);
-            block.setOutlineColor(Color(65, 95, 75));
-            block.setOutlineThickness(1.f);
+            drawTextC(window, font, "FILL A ROW TO CLEAR IT!",
+                7, C_TEXT_PINK, cx, ty + 10.f);
 
-            window.draw(block);
+            drawTextC(window, font, "4 ROWS AT ONCE = TETRIS!",
+                7, C_TEXT_PINK, cx, ty + 33.f);
+
+            drawButton(window, font, "BACK TO MENU",
+                SET_BX, SET_BY, SET_BW, SET_BH);
         }
 
-        // Right information panels
-        drawPanel(window, 640.f, 100.f, 225.f, 200.f);
-        drawPanel(window, 640.f, 325.f, 225.f, 115.f);
-        drawPanel(window, 640.f, 465.f, 225.f, 130.f);
+        // GAME OVER SCREEN
+        else if (g_screen == Screen::GAMEOVER) {
 
-        // Next piece
-        drawGameText(window, font, "NEXT PIECE",
-            9, Color(65, 110, 75), 665.f, 115.f);
+            drawPolkaBg(window);
 
-        drawNext(window, g_nextType, g_nextColor);
-
-        // Speed information
-        drawGameText(window, font, "SPEED",
-            9, Color(65, 110, 75), 665.f, 345.f);
-
-        float speed = 0.30f / delay;
-
-        drawGameText(window, font,
-            std::to_string(speed).substr(0, 4) + "x",
-            13, Color(45, 85, 60), 665.f, 385.f);
-
-        // Controls
-        drawGameText(window, font, "CONTROLS",
-            9, Color(65, 110, 75), 665.f, 480.f);
-
-        drawGameText(window, font, "LEFT / RIGHT",
-            7, Color(65, 110, 75), 665.f, 515.f);
-
-        drawGameText(window, font, "UP = ROTATE",
-            7, Color(65, 110, 75), 665.f, 535.f);
-
-        drawGameText(window, font, "DOWN = FAST",
-            7, Color(65, 110, 75), 665.f, 555.f);
-
-        drawGameText(window, font, "SPACE = DROP",
-            7, Color(65, 110, 75), 665.f, 575.f);
-
-        // Pause overlay
-        if (g_paused)
-        {
-            RectangleShape overlay({
-                (float)BOARD_W,
-                (float)BOARD_H
+            RectangleShape tint({
+                (float)WIN_W,
+                (float)WIN_H
                 });
 
-            overlay.setPosition({
-                (float)BOARD_X,
-                (float)BOARD_Y
-                });
+            tint.setFillColor(Color(180, 230, 200, 90));
+            window.draw(tint);
 
-            overlay.setFillColor(Color(40, 70, 50, 190));
+            if (gameOverLoaded) {
+                window.draw(gameOverSpr);
+            }
+            else {
+                drawTextC(window, font, "GAME OVER", 22,
+                    C_DEEP_PINK, WIN_W / 2.f, 110.f);
 
-            window.draw(overlay);
+                drawTextC(window, font, "CONTINUE?", 12,
+                    C_HOT_PINK, WIN_W / 2.f, 170.f);
+            }
 
-            drawGameText(window, font, "PAUSED",
-                17, Color::White,
-                BOARD_X + 65.f,
-                BOARD_Y + 270.f);
-        }
+            drawCard(window, WIN_W / 2.f - 190.f,
+                390.f, 380.f, 125.f);
 
-        // Game over overlay
-        if (gameOver)
-        {
-            RectangleShape overlay({
-                (float)BOARD_W,
-                (float)BOARD_H
-                });
+            drawTextC(window, font,
+                "SCORE: " + std::to_string(g_score),
+                9, C_TEXT_PINK, WIN_W / 2.f, 406.f);
 
-            overlay.setPosition({
-                (float)BOARD_X,
-                (float)BOARD_Y
-                });
+            drawTextC(window, font,
+                "LEVEL: " + std::to_string(g_level),
+                9, C_TEXT_PINK, WIN_W / 2.f, 436.f);
 
-            overlay.setFillColor(Color(40, 70, 50, 210));
+            drawTextC(window, font,
+                "LINES: " + std::to_string(g_lines),
+                9, C_TEXT_PINK, WIN_W / 2.f, 466.f);
 
-            window.draw(overlay);
+            drawButton(window, font, "YES!",
+                GO_YES_X, GO_BY, GO_BW, GO_BH);
 
-            drawGameText(window, font, "GAME OVER",
-                14, Color::White,
-                BOARD_X + 48.f,
-                BOARD_Y + 250.f);
-
-            drawGameText(window, font, "PRESS R TO RESTART",
-                7, Color::White,
-                BOARD_X + 38.f,
-                BOARD_Y + 300.f);
+            drawButton(window, font, "HOME",
+                GO_HOME_X, GO_BY, GO_BW, GO_BH);
         }
 
         window.display();
